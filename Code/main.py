@@ -53,4 +53,5 @@ optimizer = optim.Adam(model.parameters())
 
 loss = nn.BCEWithLogitsLoss(reduction='mean')
 
-train.train_model(model, device, dataloaders, loss, optimizer, seq_type)
+
+#train.train_model(model, device, dataloaders, loss, optimizer, seq_type)

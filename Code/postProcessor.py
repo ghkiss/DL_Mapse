@@ -27,51 +27,121 @@ class PostProcessor(object):
     def __call__(self, predicted_pmap, reference, left, pixelsize, scale_correction):
         try:
             coordinates = self.coordinateExtract(predicted_pmap)
+            coordinates = coordinates * scale_correction
+            #coordinates = reference
+            #coordinates[np.where(coordinates==1.)] = np.nan
+            #coordinates = np.reshape(coordinates, (reference.shape[0],2,2))
+
+            coordinates_mean = np.reshape(coordinates, (2*coordinates.shape[0],2))
+            coordinates_mean[:,0] += left
+            ret_cor = coordinates_mean
+            ret_cor = np.reshape(ret_cor, (coordinates.shape[0],4))
+            reference = np.reshape(reference, (2*reference.shape[0],2))
+
+            """
+            tp = np.zeros((2))
+            tn = np.zeros((2))
+            fp = np.zeros((2))
+            fn = np.zeros((2))
+
+            for i in range(coordinates_mean.shape[0]):
+                if np.isnan(coordinates_mean[i,:]).any() and (reference[i,:]==1.).any():
+                    tp[i%2] += 1
+                elif np.isnan(coordinates_mean[i,:]).any() and not (reference[i,:]==1.).any():
+                    fp[i%2] += 1
+                elif not np.isnan(coordinates_mean[i,:]).any() and (reference[i,:]==1.).any():
+                    fn[i%2] += 1
+                else:
+                    tn[i%2] += 1
+            """
+            coordinates_mean = np.delete(coordinates_mean, np.where(reference==1.)[0], 0)
+            reference = np.delete(reference, np.where(reference==1.)[0], 0)
+            reference = np.delete(reference, np.where(np.isnan(coordinates_mean))[0], 0)
+            coordinates_mean = np.delete(coordinates_mean, np.where(np.isnan(coordinates_mean))[0], 0)
+
+
+            ref_scat = reference[:,1]/2
+            pred_scat = coordinates_mean[:,1]/2
+            x_dist = np.mean(np.abs(coordinates_mean[:,0]-reference[:,0]))
+            y_dist = np.mean(np.abs(coordinates_mean[:,1]-reference[:,1]))
+            mean_dist = np.mean(np.sqrt(np.sum(np.power((coordinates_mean-reference),2), axis=1)))
+            print(mean_dist, x_dist, y_dist)
+
             #coordinates = self.rotate(coordinates)
 
-            print(scale_correction)
-            coordinates = coordinates * scale_correction
-            print(reference)
-            print(coordinates)
-            mean_dist = 0
-            for i in range(reference.shape[0]):
-                mean_dist += np.sqrt((reference[i,0]-(coordinates[i,0,0]+left))**2+(reference[i,1]-coordinates[i,0,1])**2)
-                mean_dist += np.sqrt(np.power((reference[i,2]-(coordinates[i,1,0]+left)),2)+np.power((reference[i,3]-coordinates[i,1,1]),2))
+            #plt.clf()
+            #plt.plot(coordinates[:,1,1], 'r', linewidth=1, label='Estimate')
+            #plt.xlabel('Frame in sequence')
+            #plt.ylabel('Y-coordinate location [mm]')
+            #plt.grid(b=True)
 
-            mean_dist /= (2*reference.shape[0])
-            print(mean_dist)
+            #left_movement, right_movement = self.extractHorisontalMovement(coordinates)
 
+            #left_es, left_ed, lp_l = self.peakDetect(left_movement)
+            #right_es, right_ed, lp_r = self.peakDetect(right_movement)
 
-            left_movement, right_movement = self.extractHorisontalMovement(coordinates)
+            """
+            plt.plot(lp_r, 'g', linewidth=1, label='Low-pass filtered')
+            plt.scatter(right_movement['t'][right_es], right_movement['y'][right_es], c='b', marker='*', label='Peak')
+            plt.scatter(right_movement['t'][right_ed], right_movement['y'][right_ed], c='b', marker='*')
+            plt.legend()
 
-            left_es, left_ed, lp_l = self.peakDetect(left_movement)
-            right_es, right_ed, lp_r = self.peakDetect(right_movement)
+            plt.show()
 
             plt.clf()
-            plt.plot(left_movement['t'], left_movement['y'])
-            plt.plot(right_movement['t'], right_movement['y'])
-            plt.plot(lp_l)
-            plt.plot(lp_r)
-            plt.plot(left_movement['t'][left_es], left_movement['y'][left_es], marker='x')
-            plt.plot(left_movement['t'][left_ed], left_movement['y'][left_ed], marker='x')
-            plt.plot(right_movement['t'][right_es], right_movement['y'][right_es], marker='x')
-            plt.plot(right_movement['t'][right_ed], right_movement['y'][right_ed], marker='x')
-            plt.grid(b=True, which='both')
+            plt.subplot(2,1,1)
+            plt.plot(left_movement['t'], left_movement['y'], 'r', linewidth=1, label='Estimate')
+            plt.scatter(left_movement['t'][left_es], left_movement['y'][left_es], c='b', marker='*', label='Peak')
+            plt.scatter(left_movement['t'][left_ed], left_movement['y'][left_ed], c='b', marker='*')
+            plt.title('Movement of left and right landmark')
+            plt.xlabel('Frame in sequence')
+            plt.ylabel('Y-coordinate location [mm]')
+            plt.grid(b=True)
+            plt.legend()
+
+            plt.subplot(2,1,2)
+            plt.plot(right_movement['t'], right_movement['y'], 'r', linewidth=1, label='Estimate')
+            #plt.scatter(right_movement['t'][right_es], right_movement['y'][right_es], c='b', marker='*', label='Peak')
+            #plt.scatter(right_movement['t'][right_ed], right_movement['y'][right_ed], c='b', marker='*')
+            plt.xlabel('Frame in sequence')
+            plt.ylabel('Y-coordinate location [mm]')
+            plt.grid(b=True)
+            plt.legend()
+
             plt.show()
-            left_mapse = self.mapseCalc(left_movement['y'][left_es], left_movement['y'][left_ed], pixelsize)
-            right_mapse = self.mapseCalc(right_movement['y'][right_es], right_movement['y'][right_ed], pixelsize)
+            """
+
+            #left_mapse = self.mapseCalc(left_movement['y'][left_es], left_movement['y'][left_ed], pixelsize)
+            #right_mapse = self.mapseCalc(right_movement['y'][right_es], right_movement['y'][right_ed], pixelsize)
         except:
-            left_mapse = np.nan
-            right_mapse = np.nan
+            print("FEIL")
+            #left_mapse = np.nan
+            #right_mapse = np.nan
 
-        mapse = {'left':left_mapse, 'right':right_mapse}
-        measurement_info = {'left_es':left_es,'left_ed':left_ed,
-                            'right_es':right_es,'right_ed':right_ed,
-                            'left_movement':left_movement,'right_movement':right_movement}
+        #mapse = {'left':round(right_mapse,2)}#, 'right':round(right_mapse,2)}
+        #print(mapse)
+        """
+        if left_movement['nan'][left_movement['t'][left_es] + 1].any() or left_movement['nan'][left_movement['t'][left_es] - 1].any():
+            print("Left es not good")
+        if left_movement['nan'][left_movement['t'][left_ed] + 1].any() or left_movement['nan'][left_movement['t'][left_ed] - 1].any():
+            print("Left ed not good")
+        if right_movement['nan'][right_movement['t'][right_es] + 1].any() or right_movement['nan'][right_movement['t'][right_es] - 1].any():
+            print("Right es not good")
+        if right_movement['nan'][right_movement['t'][right_ed] + 1].any() or right_movement['nan'][right_movement['t'][right_ed] - 1].any():
+            print("Right ed not good")
+        """
 
-        print(mapse)
+        #print("Number of frames left not detected: ", np.sum(left_movement['nan'])/left_movement['nan'].shape[0])
+        #print("Number of frames right not detected: ", np.sum(right_movement['nan'])/right_movement['nan'].shape[0])
 
-        return mapse, measurement_info
+        #measurement_info = {left_movement, right_movement}
+        measurement_info = {'euclidean':mean_dist, 'x':x_dist, 'y':y_dist}
+        #                    'pred':pred_scat, 'ref':ref_scat,
+        #                    'tp': tp, 'fp':fp, 'tn':tn, 'fn':fn}
+
+        #print(mapse)
+
+        return ret_cor
 
 
     def extractHorisontalMovement(self, coordinates):
@@ -101,7 +171,7 @@ class PostProcessor(object):
 
 class CoordinateExtractor(object):
 
-    def __init__(self, method="argmax", threshold=0.5):
+    def __init__(self, method="centroid", threshold=0.5):
         self.method = method
         self.threshold = threshold
 
@@ -109,12 +179,20 @@ class CoordinateExtractor(object):
         coordinates = np.empty((predicted_pmap.shape[0],2,2))
         if self.method == "argmax":
             for i in range(predicted_pmap.shape[0]):
-                left_argmax_idx = torch.argmax(predicted_pmap[i,0,:,:])
-                right_argmax_idx = torch.argmax(predicted_pmap[i,1,:,:])
-                left_point = (left_argmax_idx / predicted_pmap.shape[-2],
-                              left_argmax_idx % predicted_pmap.shape[-1])
-                right_point = (right_argmax_idx / predicted_pmap.shape[-2],
-                               right_argmax_idx % predicted_pmap.shape[-1])
+                if torch.max(predicted_pmap[i,0,:,:]) < 0.5:
+                    left_point = (np.nan, np.nan)
+                else:
+                    left_argmax_idx = torch.argmax(predicted_pmap[i,0,:,:])
+                    left_point = (left_argmax_idx / predicted_pmap.shape[-2],
+                                  left_argmax_idx % predicted_pmap.shape[-1])
+
+                if torch.max(predicted_pmap[i,1,:,:]) < 0.5:
+                    right_point = (np.nan, np.nan)
+                else:
+                    right_argmax_idx = torch.argmax(predicted_pmap[i,1,:,:])
+                    right_point = (right_argmax_idx / predicted_pmap.shape[-2],
+                                   right_argmax_idx % predicted_pmap.shape[-1])
+
 
                 coordinates[i,0,0] = left_point[1]
                 coordinates[i,0,1] = left_point[0]
@@ -124,8 +202,8 @@ class CoordinateExtractor(object):
         else:
             predicted_pmap = predicted_pmap.ge(self.threshold).numpy()
             for i in range(predicted_pmap.shape[0]):
-                left_point = nd.center_of_mass(predicted_pmap[i,0,:,:])
-                right_point = nd.center_of_mass(predicted_pmap[i,1,:,:])
+                left_point = nd.center_of_mass(predicted_pmap[i,0,:,:]) if (predicted_pmap[i,0,:,:]>0.).any() else (np.nan, np.nan)
+                right_point = nd.center_of_mass(predicted_pmap[i,1,:,:]) if (predicted_pmap[i,1,:,:]>0.).any() else (np.nan, np.nan)
 
                 coordinates[i,0,0] = left_point[1]
                 coordinates[i,0,1] = left_point[0]
@@ -147,13 +225,16 @@ class Rotation(object):
 
             if np.isnan(y).all():
                 raise Exception('NAN in before rotation')
-            origin_idx = np.nanargmin(y)
-            origin = np.array([x[origin_idx], y[origin_idx]])
+            #origin_idx = np.nanargmin(y)
+            #origin = np.array([x[origin_idx], y[origin_idx]])
 
             x_nnan = x[~np.isnan(x)]
             y_nnan= y[~np.isnan(y)]
 
-            ind = np.argsort(y_nnan)[-2:]
+            origin_idx = np.argsort(y_nnan)[:4]
+            origin = np.array([np.nanmean(x_nnan[origin_idx]), np.nanmean(y_nnan[origin_idx])])
+
+            ind = np.argsort(y_nnan)[-4:]
 
             mean = np.array([np.nanmean(x_nnan[ind]), np.nanmean(y_nnan[ind])])
             mean_vector = np.array([(mean[0]-origin[0]),
@@ -186,15 +267,18 @@ class PeakDetection(object):
         self.border_coeff = border_coeff
 
     def __call__(self, point):
-        border = (np.max(point['y'])-np.min(point['y']))*self.border_coeff
-        pad_front = np.ones((self.peak_distance,))*point['y'][0]
-        pad_back = np.ones((self.peak_distance,))*point['y'][-1]
-        padded = np.concatenate((pad_front,point['y'],pad_back))
-        y_lp = np.convolve(padded, np.ones((2*self.peak_distance+1,))/(2*self.peak_distance+1), mode='valid')
+        if point['y'].size > 0:
+            border = (np.max(point['y'])-np.min(point['y']))*self.border_coeff
+            pad_front = np.ones((self.peak_distance,))*point['y'][0]
+            pad_back = np.ones((self.peak_distance,))*point['y'][-1]
+            padded = np.concatenate((pad_front,point['y'],pad_back))
+            y_lp = np.convolve(padded, np.ones((2*self.peak_distance+1,))/(2*self.peak_distance+1), mode='valid')
 
-        peaks_es, _ = signal.find_peaks(-point['y'], distance=self.peak_distance, height=-y_lp+border)
-        peaks_ed, _ = signal.find_peaks(point['y'], distance=self.peak_distance, height=y_lp+border)
-
+            peaks_es, _ = signal.find_peaks(-point['y'], distance=self.peak_distance, height=-y_lp+border)
+            peaks_ed, _ = signal.find_peaks(point['y'], distance=self.peak_distance, height=y_lp+border)
+        else:
+            y_lp = np.array(())
+            peaks_es, peaks_ed = np.array(()), np.array(())
         peaks_es, peaks_ed = self.filterPeaks(peaks_es, peaks_ed)
         return peaks_es, peaks_ed, y_lp
 
